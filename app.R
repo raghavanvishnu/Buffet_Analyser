@@ -9,7 +9,7 @@ ui <- fluidPage(
     sidebarPanel(
       textInput("ticker", "NSE Ticker Symbol:", placeholder = "e.g. TCS, RELIANCE, ITC"),
       radioButtons("format", "Report Format:",
-                   choices = c("HTML" = "html_document", "PDF" = "pdf_document")),
+                   choices = c("HTML" = "html_document")),
       hr(),
       h4("Part 1: Qualitative Checklist"),
       p(em("Answer based on your own knowledge of the business — these can't be pulled from financial data.")),
