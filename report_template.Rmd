@@ -30,7 +30,16 @@ h3 {
 table {
   margin-bottom: 20px;
 }
+.finding {
+  background: #eef3f8;
+  border-left: 4px solid #2c3e50;
+  padding: 10px 16px;
+  margin: 8px 0 24px 0;
+  font-weight: 600;
+  border-radius: 4px;
+}
 </style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 source("R/load_all.R")
@@ -49,14 +58,12 @@ default_part1_questions <- c(
 part1_questions <- if (length(params$part1_questions) == 8) params$part1_questions else default_part1_questions
 part1_answers <- if (length(params$part1_answers) == 8) params$part1_answers else rep("Not answered", 8)
 
-
 report <- analyze_stock(params$ticker)
 ```
 
 # `r report$ticker`
 
-Report generated on `r format(Sys.Date(), "%d %B %Y")`.
-
+Report generated on `r format(Sys.Date(), "%d %B %Y")`. This report applies a simplified version of Warren Buffett's value-investing checklist to publicly available financial data. It is for educational purposes only and is not investment advice.
 
 ## Company Profile
 
@@ -85,6 +92,7 @@ data.frame(
   Answer = part1_answers
 ) %>% knitr::kable()
 ```
+
 ## Part 2: Numbers at a Glance
 
 ```{r}
@@ -106,6 +114,12 @@ checklist_df <- data.frame(
 )
 knitr::kable(checklist_df)
 ```
+
+```{r results='asis'}
+n_pass <- sum(unlist(report$checklist[-1]))
+cat(paste0('<div class="finding">Key takeaway: ', report$ticker, ' passes ', n_pass, ' of 5 Buffett quality checks.</div>'))
+```
+
 ## Historical Trends (10-12 Years)
 
 The checklist above tests averages and thresholds. The table and charts below show the actual year-by-year numbers behind those averages, so you can see whether performance has been steady, improving, or declining — not just whether it cleared a bar on average.
@@ -152,7 +166,14 @@ subplot(
   nrows = 2, margin = 0.08, titleY = TRUE, titleX = TRUE
 ) %>% layout(showlegend = FALSE)
 ```
+
 *A smoothly rising line across all four panels is the strongest visual signal of a durable, well-run business. Sharp dips (like a COVID-year dent) are usually explainable; erratic, directionless movement is a bigger concern than a single bad year.*
+
+```{r results='asis'}
+roe_vals <- as.numeric(report$metrics$roe)
+cat(paste0('<div class="finding">Key takeaway: ROE has ranged from ', round(min(roe_vals),1), '% to ', round(max(roe_vals),1), '%, currently at ', round(roe_vals[length(roe_vals)],1), '%.</div>'))
+```
+
 ## Part 3: Is the Price a Cheap Price?
 
 ### Stage A — Initial Rate of Return
@@ -176,13 +197,17 @@ knitr::kable(report$stage_a$bond_comparison)
 
 *"Stock Wins" means the stock's earnings yield beats that sovereign's risk-free rate — a reasonable case the stock is not overpriced relative to that alternative. "Bond Wins" means the safe government bond currently pays more. All bond yields above are manually set and should be periodically updated to current market rates; they do not account for currency movement (INR appreciation/depreciation against the bond's currency), which would also affect a real cross-currency comparison.*
 
-
+```{r results='asis'}
+bc <- report$stage_a$bond_comparison
+win_col <- bc[[ncol(bc)]]
+wins <- sum(win_col == "Stock Wins")
+total_b <- nrow(bc)
+cat(paste0('<div class="finding">Key takeaway: Earnings yield of ', round(report$stage_a$initial_rate_of_return,2), '% beats ', wins, ' of ', total_b, ' sovereign benchmarks shown.</div>'))
+```
 
 ### Stage B — Expected Return (ROE Method): Computation Sheet
 
 This method projects book value forward using the company's sustainable growth rate (average ROE reduced by what it pays out as dividends), then converts that future book value into a future stock price.
-
-
 
 $$
 g = \overline{ROE} \times (1 - \overline{Payout})
@@ -227,10 +252,13 @@ data.frame(
 ) %>% knitr::kable()
 ```
 
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: ROE method projects a ', round(report$stage_b$expected_return_roe_method,2), '% annual return over 10 years.</div>'))
+```
+
 ### Stage C — Expected Return (EPS Growth Method): Computation Sheet
 
 This method instead projects the company's own historical EPS growth rate forward directly, independent of ROE or payout assumptions — a useful cross-check against Stage B.
-
 
 $$
 g = \left(\frac{EPS_n}{EPS_0}\right)^{\frac{1}{n}} - 1
@@ -244,6 +272,7 @@ $$
 $$
 r_{EPS} = \left(\frac{P_{10}}{P_0}\right)^{\frac{1}{10}} - 1
 $$
+
 ```{r}
 data.frame(
   Step = c(
@@ -265,7 +294,11 @@ data.frame(
 ) %>% knitr::kable()
 ```
 
-### Stage D — Final Verdict (Price Only)
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: EPS growth method projects a ', round(report$stage_c$expected_return_eps_method,2), '% annual return — the more conservative of the two.</div>'))
+```
+
+### Stage D — Verdict Based on Projected Share Price Increase (Buy at Current Price, Sell at Current PE)
 
 ```{r}
 verdict_color <- switch(report$stage_d$verdict,
@@ -279,18 +312,44 @@ verdict_color <- switch(report$stage_d$verdict,
 
 **Verdict:** <span style="color:`r verdict_color`; font-weight:bold; font-size:1.3em;">`r report$stage_d$verdict`</span>
 
-*Greater than 20% = Fantastic · 12-20% = Good · Below 12% = Unacceptable*
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: At the present stock price, the return is ',
+    ifelse(report$stage_d$avg_expected_return < 12, 'below', 'above'),
+    ' our expected minimum threshold of 12%, at ', round(report$stage_d$avg_expected_return,2),
+    '% based on stock price increase alone.</div>'))
+```
 
-### Stage E — Return Scenarios Across Historical PE Range
+**What these verdicts mean:**
+
+- **FANTASTIC (>20%):** An exceptional projected return — rare, and worth double-checking the assumptions rather than assuming it's too good to be true.
+- **GOOD (12-20%):** A solid return that clears the minimum bar Buffett's method sets for taking on stock market risk over a safe alternative.
+- **UNACCEPTABLE (<12%):** The projected return doesn't adequately compensate for the risk of owning the stock versus a safer alternative — at today's price, based on price appreciation alone.
+
+### Stage E — Verdict Sensitivity: Same Projection at Min / Mean / Max Historical PE
 
 ```{r}
 knitr::kable(report$stage_e)
+```
+
+*If even the "Min Historical PE" scenario still gives an acceptable return, the investment case is robust to a market correction. If only the "Max Historical PE" scenario looks good, the current price may already be pricing in optimistic assumptions.*
+
+```{r results='asis'}
+se <- report$stage_e
+min_row <- se[se$Scenario == "Min Historical PE", ]
+ret_col <- names(se)[grepl("Expected Return.*ROE", names(se))][1]
+cat(paste0('<div class="finding">Key takeaway: Even at the lowest historical PE, ROE-method return is ', min_row[[ret_col]], '.</div>'))
 ```
 
 ### Stage F — Total Return (Price Appreciation + Dividends)
 
 ```{r}
 knitr::kable(report$stage_f)
+```
+
+```{r results='asis'}
+sf <- report$stage_f
+ret_col_f <- names(sf)[grepl("Total Expected Return", names(sf))][1]
+cat(paste0('<div class="finding">Key takeaway: Including dividends, total return rises to ', sf[[ret_col_f]][1], ' (ROE method) and ', sf[[ret_col_f]][2], ' (EPS method).</div>'))
 ```
 
 ### Stage G — Final Verdict (Including Dividends)
@@ -309,9 +368,15 @@ verdict_color_g <- switch(report$stage_g$verdict,
 
 *This verdict is more complete than Stage D's, since it accounts for both price appreciation and dividends. Where the two disagree, this one should generally be treated as the more accurate picture.*
 
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: Final verdict including dividends: ', report$stage_g$verdict, ' at ', round(report$stage_g$avg_total_expected_return,2), '%.</div>'))
+```
+
 ---
 
 ## Projected Dividends
+
+Using the average payout ratio, here is a projection of the EPS and dividend an investor might expect to receive per share each year, shown under both growth assumptions — the Stage B (ROE/book value) method and the Stage C (historical EPS growth) method.
 
 ```{r}
 knitr::kable(report$dividends$table)
@@ -322,6 +387,10 @@ knitr::kable(report$dividends$table)
 **Total dividends over `r nrow(report$dividends$table)` years (EPS Method):** ₹`r report$dividends$total_dividend_eps_method` per share
 
 *This is a projection based on historical averages, not a guarantee — actual payout policy can and does change.*
+
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: Total 10-year dividends per share range from ₹', report$dividends$total_dividend_eps_method, ' to ₹', report$dividends$total_dividend_roe_method, ' depending on the growth method assumed.</div>'))
+```
 
 ---
 
