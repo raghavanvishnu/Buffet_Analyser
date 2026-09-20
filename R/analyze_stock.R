@@ -12,6 +12,7 @@ analyze_stock <- function(ticker, years = 10) {
   dividends <- project_dividends(stage_b, stage_c, current_eps = stage_a$current_eps, years = years)  
   stage_f <- stage_f_total_return(stage_b, stage_c, dividends, years = years)
   stage_g <- stage_g_total_verdict(stage_f)
+  profile <- get_company_profile(ticker)
   
   list(
     ticker = ticker,
@@ -24,6 +25,7 @@ analyze_stock <- function(ticker, years = 10) {
     stage_e = stage_e,
     dividends = dividends,
     stage_f = stage_f,
-    stage_g = stage_g
+    stage_g = stage_g,
+    profile = profile
   )
 }

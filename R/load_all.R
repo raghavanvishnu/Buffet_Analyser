@@ -15,7 +15,8 @@ files <- c(
   "project_dividends.R",
   "analyze_stock.R",
   "stage_f_total_return.R",
-  "stage_g_total_verdict.R"
+  "stage_g_total_verdict.R",
+  "get_company_profile.R"
   
 )
 
