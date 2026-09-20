@@ -1,5 +1,6 @@
 library(rvest)
 library(dplyr)
+library(tidyquant)
 
 files <- c(
   "clean_num.R",
@@ -9,7 +10,13 @@ files <- c(
   "stage_b_roe_method.R",
   "stage_c_eps_method.R",
   "stage_d_verdict.R",
-  "analyze_stock.R"
+  "get_historical_pe.R",
+  "stage_e_pe_scenarios.R",
+  "project_dividends.R",
+  "analyze_stock.R",
+  "stage_f_total_return.R",
+  "stage_g_total_verdict.R"
+  
 )
 
 for (f in files) {
