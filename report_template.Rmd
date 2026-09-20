@@ -3,11 +3,52 @@ title: "Buffett-Style Stock Analysis"
 output: html_document
 params:
   ticker: "TCS"
+  part1_questions: "default"
+  part1_answers: "default"
 ---
-
+<style>
+h1 {
+  font-size: 2em;
+  font-weight: 800;
+  border-bottom: 3px solid #2c3e50;
+  padding-bottom: 8px;
+}
+h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-top: 40px;
+  border-bottom: 2px solid #dcdcdc;
+  padding-bottom: 5px;
+}
+h3 {
+  font-size: 1.2em;
+  font-weight: 700;
+  color: #34495e;
+  margin-top: 25px;
+}
+table {
+  margin-bottom: 20px;
+}
+</style>
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 source("R/load_all.R")
+
+default_part1_questions <- c(
+  "Strong durable competitive advantage?",
+  "Do stores need to carry the product to stay in business?",
+  "Does the product have a consumer monopoly?",
+  "Can it keep raising prices with inflation?",
+  "Needs continual plant/factory upgrades?",
+  "Product/service unlikely to go obsolete?",
+  "Still sold during a recession?",
+  "Has little competition?"
+)
+
+part1_questions <- if (length(params$part1_questions) == 8) params$part1_questions else default_part1_questions
+part1_answers <- if (length(params$part1_answers) == 8) params$part1_answers else rep("Not answered", 8)
+
 
 report <- analyze_stock(params$ticker)
 ```
@@ -16,6 +57,34 @@ report <- analyze_stock(params$ticker)
 
 Report generated on `r format(Sys.Date(), "%d %B %Y")`.
 
+
+## Company Profile
+
+**`r report$profile$company_name`** — `r report$profile$sector` / `r report$profile$industry`
+
+`r report$profile$about`
+
+```{r}
+if (length(report$profile$pros) > 0 || length(report$profile$cons) > 0) {
+  max_len <- max(length(report$profile$pros), length(report$profile$cons))
+  pros_padded <- c(report$profile$pros, rep("", max_len - length(report$profile$pros)))
+  cons_padded <- c(report$profile$cons, rep("", max_len - length(report$profile$cons)))
+  data.frame(Pros = pros_padded, Cons = cons_padded) %>% knitr::kable()
+}
+```
+
+*Pros/Cons above are Screener.in's own machine-generated highlights, based on their checklist — not this report's analysis. Exercise judgment.*
+
+## Part 1: Is the Company a Right Pick for Buffett?
+
+These are judgment calls about the business itself — not something that can be pulled from financial statements. The answers below were provided by whoever requested this report, not computed by the app.
+
+```{r}
+data.frame(
+  Question = part1_questions,
+  Answer = part1_answers
+) %>% knitr::kable()
+```
 ## Part 2: Numbers at a Glance
 
 ```{r}
@@ -42,6 +111,8 @@ knitr::kable(checklist_df)
 
 ### Stage A — Initial Rate of Return
 
+This treats the stock like a bond: EPS ÷ Price gives a rough "earnings yield." Below, that is compared against the 10-year sovereign bond yield in each major currency — since an investor today can reasonably choose to hold safe government debt in INR, USD, GBP, EUR, JPY, or CNY instead of this stock. India is the natural primary comparison for an NSE-listed stock (it is the investor's home-currency risk-free alternative), with the others shown for broader context.
+
 ```{r}
 data.frame(
   Metric = c("Current EPS", "Current Price", "Initial Rate of Return"),
@@ -52,6 +123,12 @@ data.frame(
   )
 ) %>% knitr::kable()
 ```
+
+```{r}
+knitr::kable(report$stage_a$bond_comparison)
+```
+
+*"Stock Wins" means the stock's earnings yield beats that sovereign's risk-free rate — a reasonable case the stock is not overpriced relative to that alternative. "Bond Wins" means the safe government bond currently pays more. All bond yields above are manually set and should be periodically updated to current market rates; they do not account for currency movement (INR appreciation/depreciation against the bond's currency), which would also affect a real cross-currency comparison.*
 
 ### Stage B — Expected Return (ROE Method)
 
@@ -155,4 +232,25 @@ knitr::kable(report$dividends$table)
 
 ---
 
-*This report is generated for educational purposes based on publicly available data from Screener.in and Yahoo Finance (via tidyquant). It is not investment advice.*
+## Data Sources
+
+| Data | Source |
+|---|---|
+| Financial statements (P&L, Balance Sheet, Ratios, Cash Flow) | [Screener.in](https://www.screener.in) — consolidated figures |
+| Historical share price | Yahoo Finance, via the `tidyquant` R package |
+| Historical P/E (used in Stage E) | Derived from Yahoo Finance year-end prices ÷ Screener EPS |
+| Sovereign bond yields (Stage A benchmarks) | Manually entered from recent market data; **not fetched live** — update periodically |
+
+## Suggestions and Limitations
+
+- **This is a screening tool, not a final answer.** A "GOOD" or "FANTASTIC" verdict means the stock is worth researching further — not an instruction to buy.
+- **Part 1 answers are only as good as the person answering them.** If left as "Not answered," treat the qualitative case as unverified.
+- **Bond yields need manual updates.** Rates shown reflect a snapshot in time and will drift; check current rates before relying on the Stage A comparison.
+- **Consolidated figures only.** Standalone financials (if the company has meaningfully different subsidiary performance) are not shown separately.
+- **No sector or peer comparison.** A stock passing every checklist item may still be expensive or cheap relative to sector peers — this report only evaluates the company against its own history.
+- **Ten-year horizon is a default, not a rule.** Businesses with shorter or longer natural cycles may need a different projection window than the one used here.
+- **Consider running this on 2-3 comparable companies** in the same sector before deciding, rather than evaluating a single stock in isolation.
+
+---
+
+*This report is generated for educational purposes based on publicly available data from Screener.in and Yahoo Finance (via tidyquant). It is not investment advice. Past performance and historical ratios do not guarantee future results.*
