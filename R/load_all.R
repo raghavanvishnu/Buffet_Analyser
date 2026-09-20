@@ -1,6 +1,8 @@
 library(rvest)
 library(dplyr)
 library(tidyquant)
+library(ggplot2)
+library(plotly)
 
 files <- c(
   "clean_num.R",

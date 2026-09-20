@@ -9,10 +9,11 @@ stage_f_total_return <- function(stage_b, stage_c, dividends, years = 10) {
   
   data.frame(
     Method = c("ROE Method", "EPS Growth Method"),
-    Current_Price = round(current_price, 2),
-    Future_Stock_Price = round(c(stage_b$future_price, stage_c$future_price), 2),
-    Total_Dividends_10yr = round(c(dividends$total_dividend_roe_method, dividends$total_dividend_eps_method), 2),
-    Total_Value = round(c(total_value_roe, total_value_eps), 2),
-    Total_Expected_Return = paste0(round(c(return_roe, return_eps), 2), "%")
+    `Current Price` = round(current_price, 2),
+    `Future Stock Price` = round(c(stage_b$future_price, stage_c$future_price), 2),
+    `Total Dividends (10yr)` = round(c(dividends$total_dividend_roe_method, dividends$total_dividend_eps_method), 2),
+    `Total Value` = round(c(total_value_roe, total_value_eps), 2),
+    `Total Expected Return` = paste0(round(c(return_roe, return_eps), 2), "%"),
+    check.names = FALSE
   )
 }

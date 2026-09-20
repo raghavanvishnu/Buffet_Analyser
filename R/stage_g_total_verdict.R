@@ -1,5 +1,5 @@
 stage_g_total_verdict <- function(stage_f) {
-  returns <- as.numeric(gsub("%", "", stage_f$Total_Expected_Return))
+  returns <- as.numeric(gsub("%", "", stage_f[["Total Expected Return"]]))
   avg_return <- mean(returns)
   
   verdict <- if (avg_return > 20) {
