@@ -1,0 +1,114 @@
+---
+title: "Buffett-Style Stock Analysis"
+output: html_document
+params:
+  ticker: "TCS"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+source("R/load_all.R")
+
+report <- analyze_stock(params$ticker)
+```
+
+# `r report$ticker`
+
+Report generated on `r format(Sys.Date(), "%d %B %Y")`.
+
+## Part 2: Numbers at a Glance
+
+```{r}
+checklist_df <- data.frame(
+  Criterion = c(
+    "Strong upward EPS trend (10yr)",
+    "ROE above 15% (10yr avg)",
+    "ROIC/ROCE above 12% (10yr avg)",
+    "Long-term debt < 5x Net Income",
+    "Free Cash Flow positive (all years)"
+  ),
+  Result = c(
+    ifelse(report$checklist$eps_upward_trend, "Yes", "No"),
+    ifelse(report$checklist$roe_above_15, "Yes", "No"),
+    ifelse(report$checklist$roic_above_12, "Yes", "No"),
+    ifelse(report$checklist$debt_below_5x_ni, "Yes", "No"),
+    ifelse(report$checklist$fcf_positive, "Yes", "No")
+  )
+)
+knitr::kable(checklist_df)
+```
+
+## Part 3: Is the Price a Cheap Price?
+
+### Stage A — Initial Rate of Return
+
+```{r}
+data.frame(
+  Metric = c("Current EPS", "Current Price", "Initial Rate of Return"),
+  Value = c(
+    round(report$stage_a$current_eps, 2),
+    round(report$stage_a$current_price, 2),
+    paste0(round(report$stage_a$initial_rate_of_return, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+### Stage B — Expected Return (ROE Method)
+
+```{r}
+data.frame(
+  Metric = c(
+    "Average ROE (10yr)", "Average Payout Ratio (10yr)", "Sustainable Growth Rate",
+    "Book Value", "Future Book Value (10yr)", "Future EPS (10yr)",
+    "P/E Ratio", "Future Stock Price (10yr)", "Expected Return (ROE Method)"
+  ),
+  Value = c(
+    paste0(round(report$stage_b$avg_roe, 2), "%"),
+    paste0(round(report$stage_b$avg_payout, 2), "%"),
+    paste0(round(report$stage_b$growth_rate, 2), "%"),
+    round(report$stage_b$book_value, 2),
+    round(report$stage_b$future_book_value, 2),
+    round(report$stage_b$future_eps, 2),
+    round(report$stage_b$pe_ratio, 2),
+    round(report$stage_b$future_price, 2),
+    paste0(round(report$stage_b$expected_return_roe_method, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+### Stage C — Expected Return (EPS Growth Method)
+
+```{r}
+data.frame(
+  Metric = c(
+    "Current EPS", "EPS Growth Rate (historical)", "Future EPS (10yr)",
+    "P/E Ratio", "Future Stock Price (10yr)", "Expected Return (EPS Method)"
+  ),
+  Value = c(
+    round(report$stage_c$current_eps, 2),
+    paste0(round(report$stage_c$eps_growth_rate, 2), "%"),
+    round(report$stage_c$future_eps, 2),
+    round(report$stage_c$pe_ratio, 2),
+    round(report$stage_c$future_price, 2),
+    paste0(round(report$stage_c$expected_return_eps_method, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+### Stage D — Final Verdict
+
+```{r}
+verdict_color <- switch(report$stage_d$verdict,
+  "FANTASTIC" = "green",
+  "GOOD" = "darkorange",
+  "UNACCEPTABLE" = "red"
+)
+```
+
+**Average Expected Return:** `r round(report$stage_d$avg_expected_return, 2)`%
+
+**Verdict:** <span style="color:`r verdict_color`; font-weight:bold; font-size:1.3em;">`r report$stage_d$verdict`</span>
+
+---
+
+*This report is generated for educational purposes based on publicly available data from Screener.in. It is not investment advice.*
