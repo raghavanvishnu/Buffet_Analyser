@@ -1,0 +1,1 @@
+clean_num <- function(x) as.numeric(gsub(",", "", x))
