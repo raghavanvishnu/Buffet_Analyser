@@ -95,7 +95,7 @@ data.frame(
 ) %>% knitr::kable()
 ```
 
-### Stage D — Final Verdict
+### Stage D — Final Verdict (Price Only)
 
 ```{r}
 verdict_color <- switch(report$stage_d$verdict,
@@ -109,6 +109,50 @@ verdict_color <- switch(report$stage_d$verdict,
 
 **Verdict:** <span style="color:`r verdict_color`; font-weight:bold; font-size:1.3em;">`r report$stage_d$verdict`</span>
 
+*Greater than 20% = Fantastic · 12-20% = Good · Below 12% = Unacceptable*
+
+### Stage E — Return Scenarios Across Historical PE Range
+
+```{r}
+knitr::kable(report$stage_e)
+```
+
+### Stage F — Total Return (Price Appreciation + Dividends)
+
+```{r}
+knitr::kable(report$stage_f)
+```
+
+### Stage G — Final Verdict (Including Dividends)
+
+```{r}
+verdict_color_g <- switch(report$stage_g$verdict,
+  "FANTASTIC" = "green",
+  "GOOD" = "darkorange",
+  "UNACCEPTABLE" = "red"
+)
+```
+
+**Average Total Expected Return:** `r round(report$stage_g$avg_total_expected_return, 2)`%
+
+**Final Verdict (Including Dividends):** <span style="color:`r verdict_color_g`; font-weight:bold; font-size:1.3em;">`r report$stage_g$verdict`</span>
+
+*This verdict is more complete than Stage D's, since it accounts for both price appreciation and dividends. Where the two disagree, this one should generally be treated as the more accurate picture.*
+
 ---
 
-*This report is generated for educational purposes based on publicly available data from Screener.in. It is not investment advice.*
+## Projected Dividends
+
+```{r}
+knitr::kable(report$dividends$table)
+```
+
+**Total dividends over `r nrow(report$dividends$table)` years (ROE Method):** ₹`r report$dividends$total_dividend_roe_method` per share
+
+**Total dividends over `r nrow(report$dividends$table)` years (EPS Method):** ₹`r report$dividends$total_dividend_eps_method` per share
+
+*This is a projection based on historical averages, not a guarantee — actual payout policy can and does change.*
+
+---
+
+*This report is generated for educational purposes based on publicly available data from Screener.in and Yahoo Finance (via tidyquant). It is not investment advice.*
