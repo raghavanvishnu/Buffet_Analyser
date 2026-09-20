@@ -17,11 +17,12 @@ stage_e_pe_scenarios <- function(ticker, metrics, stage_b, stage_c, years = 10) 
     
     data.frame(
       Scenario = pe_label,
-      PE_Used = round(pe_value, 2),
-      Future_Price_ROE_Method = round(future_price_roe, 2),
-      Expected_Return_ROE_Method = paste0(round(return_roe, 2), "%"),
-      Future_Price_EPS_Method = round(future_price_eps, 2),
-      Expected_Return_EPS_Method = paste0(round(return_eps, 2), "%")
+      `PE Used` = round(pe_value, 2),
+      `Future Price (ROE Method)` = round(future_price_roe, 2),
+      `Expected Return (ROE Method)` = paste0(round(return_roe, 2), "%"),
+      `Future Price (EPS Method)` = round(future_price_eps, 2),
+      `Expected Return (EPS Method)` = paste0(round(return_eps, 2), "%"),
+      check.names = FALSE
     )
   }
   

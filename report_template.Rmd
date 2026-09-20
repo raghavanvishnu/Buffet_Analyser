@@ -106,7 +106,53 @@ checklist_df <- data.frame(
 )
 knitr::kable(checklist_df)
 ```
+## Historical Trends (10-12 Years)
 
+The checklist above tests averages and thresholds. The table and charts below show the actual year-by-year numbers behind those averages, so you can see whether performance has been steady, improving, or declining — not just whether it cleared a bar on average.
+
+```{r}
+years <- names(report$metrics$roe)
+hist_df <- data.frame(
+  Year = years,
+  `ROE %` = round(as.numeric(report$metrics$roe), 2),
+  `EPS (Rs)` = round(as.numeric(report$metrics$eps), 2),
+  `ROCE %` = round(as.numeric(report$metrics$roce), 2),
+  `FCF (Rs Cr)` = round(as.numeric(report$metrics$free_cash_flow), 2),
+  check.names = FALSE
+)
+knitr::kable(hist_df)
+```
+
+```{r fig.width=9, fig.height=6}
+long_df <- rbind(
+  data.frame(Year = years, Value = as.numeric(report$metrics$roe), Metric = "ROE %"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$eps), Metric = "EPS (Rs)"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$roce), Metric = "ROCE %"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$free_cash_flow), Metric = "FCF (Rs Cr)")
+)
+long_df$Year <- factor(long_df$Year, levels = years)
+
+make_plot <- function(metric_name) {
+  d <- long_df[long_df$Metric == metric_name, ]
+  plot_ly(d, x = ~Year, y = ~Value, type = "scatter", mode = "lines+markers",
+          line = list(color = "#2c3e50"), marker = list(color = "#2c3e50"),
+          name = metric_name, hovertemplate = paste0(metric_name, ": %{y}<br>%{x}<extra></extra>")) %>%
+    layout(
+      annotations = list(
+        text = metric_name, x = 0.5, y = 1.08, xref = "paper", yref = "paper",
+        showarrow = FALSE, font = list(size = 13, face = "bold")
+      ),
+      xaxis = list(tickangle = -45)
+    )
+}
+
+subplot(
+  make_plot("ROE %"), make_plot("EPS (Rs)"),
+  make_plot("ROCE %"), make_plot("FCF (Rs Cr)"),
+  nrows = 2, margin = 0.08, titleY = TRUE, titleX = TRUE
+) %>% layout(showlegend = FALSE)
+```
+*A smoothly rising line across all four panels is the strongest visual signal of a durable, well-run business. Sharp dips (like a COVID-year dent) are usually explainable; erratic, directionless movement is a bigger concern than a single bad year.*
 ## Part 3: Is the Price a Cheap Price?
 
 ### Stage A — Initial Rate of Return
@@ -130,14 +176,42 @@ knitr::kable(report$stage_a$bond_comparison)
 
 *"Stock Wins" means the stock's earnings yield beats that sovereign's risk-free rate — a reasonable case the stock is not overpriced relative to that alternative. "Bond Wins" means the safe government bond currently pays more. All bond yields above are manually set and should be periodically updated to current market rates; they do not account for currency movement (INR appreciation/depreciation against the bond's currency), which would also affect a real cross-currency comparison.*
 
-### Stage B — Expected Return (ROE Method)
+
+
+### Stage B — Expected Return (ROE Method): Computation Sheet
+
+This method projects book value forward using the company's sustainable growth rate (average ROE reduced by what it pays out as dividends), then converts that future book value into a future stock price.
+
+
+
+$$
+g = \overline{ROE} \times (1 - \overline{Payout})
+$$
+$$
+BV_{10} = BV_0 \times (1+g)^{10}
+$$
+$$
+EPS_{10} = BV_{10} \times \overline{ROE}
+$$
+$$
+P_{10} = EPS_{10} \times \frac{P}{E}
+$$
+$$
+r_{ROE} = \left(\frac{P_{10}}{P_0}\right)^{\frac{1}{10}} - 1
+$$
 
 ```{r}
 data.frame(
-  Metric = c(
-    "Average ROE (10yr)", "Average Payout Ratio (10yr)", "Sustainable Growth Rate",
-    "Book Value", "Future Book Value (10yr)", "Future EPS (10yr)",
-    "P/E Ratio", "Future Stock Price (10yr)", "Expected Return (ROE Method)"
+  Step = c(
+    "1. Average ROE (10yr)",
+    "2. Average Payout Ratio (10yr)",
+    "3. Sustainable Growth Rate = ROE x (1 - Payout)",
+    "4. Current Book Value",
+    "5. Future Book Value = Book Value x (1 + Growth)^10",
+    "6. Future EPS = Future Book Value x Average ROE",
+    "7. P/E Ratio applied",
+    "8. Future Stock Price = Future EPS x P/E",
+    "9. Expected Return (ROE Method)"
   ),
   Value = c(
     paste0(round(report$stage_b$avg_roe, 2), "%"),
@@ -153,13 +227,32 @@ data.frame(
 ) %>% knitr::kable()
 ```
 
-### Stage C — Expected Return (EPS Growth Method)
+### Stage C — Expected Return (EPS Growth Method): Computation Sheet
 
+This method instead projects the company's own historical EPS growth rate forward directly, independent of ROE or payout assumptions — a useful cross-check against Stage B.
+
+
+$$
+g = \left(\frac{EPS_n}{EPS_0}\right)^{\frac{1}{n}} - 1
+$$
+$$
+EPS_{10} = EPS_0 \times (1+g)^{10}
+$$
+$$
+P_{10} = EPS_{10} \times \frac{P}{E}
+$$
+$$
+r_{EPS} = \left(\frac{P_{10}}{P_0}\right)^{\frac{1}{10}} - 1
+$$
 ```{r}
 data.frame(
-  Metric = c(
-    "Current EPS", "EPS Growth Rate (historical)", "Future EPS (10yr)",
-    "P/E Ratio", "Future Stock Price (10yr)", "Expected Return (EPS Method)"
+  Step = c(
+    "1. Current EPS",
+    "2. Historical EPS Growth Rate (10yr CAGR)",
+    "3. Future EPS = Current EPS x (1 + Growth)^10",
+    "4. P/E Ratio applied",
+    "5. Future Stock Price = Future EPS x P/E",
+    "6. Expected Return (EPS Method)"
   ),
   Value = c(
     round(report$stage_c$current_eps, 2),
