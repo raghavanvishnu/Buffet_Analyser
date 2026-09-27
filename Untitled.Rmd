@@ -1,0 +1,88 @@
+# How This Project Works — Plain-Language Walkthrough
+
+\---
+
+## 1\. The problem it solves
+
+Warren Buffett's investing checklist (via Mary Buffett \& David Clark's books) gives a structured way to judge whether a stock is a *quality business* and whether it's *fairly priced*. Doing this by hand for one stock means pulling 10+ years of financials, computing ratios, and doing compound-growth math manually — slow and error-prone.
+
+This tool automates the whole pipeline: give it a ticker, it pulls the financials, runs every calculation the checklist specifies, and produces a report.
+
+\---
+
+## 2\. The overall architecture (say this first if asked to summarize)
+
+> "It's split into three layers: a data layer that scrapes financials from the web, a logic layer of pure calculation functions that don't touch the internet at all, and a presentation layer — a Shiny app plus an R Markdown report template — that ties it together for the user."
+
+That three-layer split is the single most important architectural decision in the project, because:
+
+* The **logic layer is unit-testable** without needing live internet access (see `tests/`).
+* The **data layer can be swapped** (e.g. adding a US stock data source later) without touching any of the math.
+* The **presentation layer can change** (Shiny app today, could be a different UI tomorrow) without touching the math either.
+
+\---
+
+## 3\. The data layer — `get\_buffett\_metrics.R`, `get\_company\_profile.R`, `get\_historical\_pe.R`, `search\_company.R`
+
+These are the only files that talk to the internet.
+
+* **`get\_buffett\_metrics.R`** — scrapes Screener.in's Profit \& Loss, Balance Sheet, Ratios, and Cash Flow tables for a ticker (using `rvest`, an R package for reading HTML), then computes ROE, EPS trend, ROCE, debt-to-net-income, and free cash flow from the raw numbers.
+* **`get\_company\_profile.R`** — scrapes the company's name, sector, description, and Screener's own "Pros/Cons" summary.
+* **`get\_historical\_pe.R`** — combines two sources: Yahoo Finance price history (via the `tidyquant` package) and the EPS numbers from above, to work out what P/E ratio the stock has traded at in past years — Yahoo alone doesn't give you historical P/E directly.
+* **`search\_company.R`** — hits Screener's own internal search API (the same one their website's search box uses) so users can type a company name instead of needing to already know the exact ticker.
+
+**Why error handling matters here specifically:** web scraping is fragile — if a website changes its layout, code can silently return garbage instead of failing loudly. `get\_buffett\_metrics.R` checks each table and each row explicitly and stops with a specific message (e.g. *"Could not find a 'Free Cash Flow' row for ticker X"*) rather than letting broken data flow silently into later calculations.
+
+\---
+
+## 4\. The logic layer — the "Stages" (this is the core of the project)
+
+Each stage is one R file, doing one calculation, taking clean numbers in and producing clean numbers out. None of them touch the internet — you could test every one of them with made-up numbers, which is exactly what the unit tests do.
+
+|Stage|File|What it computes, in plain terms|
+|-|-|-|
+|Part 2 checklist|`buffett\_checklist.R`|Yes/No on 5 quality criteria (ROE > 15%, ROCE > 12%, etc.)|
+|A|`stage\_a\_initial\_return.R`|Treats the stock like a bond (EPS ÷ Price = "earnings yield") and compares that against government bond yields in 6 currencies|
+|B|`stage\_b\_roe\_method.R`|Projects the stock's future price 10 years out, using its own ROE and how much of its profit it reinvests vs pays as dividends|
+|C|`stage\_c\_eps\_method.R`|Same goal as B, but using a different method — projecting the company's own historical EPS growth rate forward, as a cross-check|
+|D|`stage\_d\_verdict.R`|Averages B and C into one number, classified as Fantastic / Good / Unacceptable using Buffett's own thresholds (20% / 12%)|
+|E|`stage\_e\_pe\_scenarios.R`|Repeats B and C's math, but using the stock's *lowest*, *average*, and *highest* historical P/E instead of just today's — a sensitivity check|
+|F|`stage\_f\_total\_return.R`|Adds projected dividends on top of B and C's price-only projections, for a fuller "total return" number|
+|G|`stage\_g\_total\_verdict.R`|Same Fantastic/Good/Unacceptable classification as D, but using F's total-return number instead of price-only|
+|H|`stage\_h\_pe\_scenario\_total\_returns.R`|Combines E and F — dividends added to *every* P/E scenario, not just today's|
+|I|`stage\_i\_buy\_price\_sensitivity.R`|Asks the reverse question: if you'd bought at a lower or higher price than today, how does that change your return?|
+
+**The one bug-fix worth mentioning if asked about debugging:** early on, Stages B and C used *today's* P/E for the future-price projection. But the checklist actually specifies using the *average* historical P/E (or today's, if that's lower) — using today's P/E alone can overstate returns if the stock is currently trading unusually expensive. Fixing this meant computing that "correct" P/E once, in `analyze\_stock.R`, and passing it into both B and C so they stay consistent with each other.
+
+\---
+
+## 5\. The orchestrator — `analyze\_stock.R`
+
+This one function calls every stage above, in the right order, and returns one big list containing everything the report needs. Nothing in the report template does its own math — it only formats numbers `analyze\_stock()` already computed. This separation (compute vs. display) means the same numbers can never disagree between different parts of the report.
+
+`load\_all.R` is a small helper that just `source()`s every file in the right order, so a single line (`source("R/load\_all.R")`) loads the whole project.
+
+\---
+
+## 6\. The presentation layer
+
+* **`report\_template.Rmd`** — an R Markdown document. Each section pulls its numbers from the `analyze\_stock()` output and formats them as tables, LaTeX-rendered formulas (via MathJax), and interactive Plotly charts. It also has a "Part 1" qualitative checklist (moat, pricing power, etc.) that a human fills in, since those judgment calls can't be computed from financial data.
+* **`app.R`** — a Shiny app. Its job is purely UI: search for a company, collect the Part 1 answers, then call `rmarkdown::render()` on the template above and display the result inline.
+
+\---
+
+## 7\. Supporting infrastructure
+
+* **`renv.lock`** — locks every package to an exact version, so the project behaves identically on any machine (including shinyapps.io's servers) instead of breaking when a package updates.
+* **`tests/testthat/`** — unit tests for the pure logic layer only (Stage D/G verdict thresholds, dividend compounding math, checklist pass/fail logic). Deliberately *not* testing the scrapers, since those depend on external website structure rather than internal logic — that's a scoping decision, not an oversight (documented in the README).
+
+\---
+
+## 8\. If asked "what would you do differently / what's the biggest limitation?"
+
+Honest answers, not defensive ones:
+
+* The scraping layer is inherently fragile — if Screener.in changes their HTML, the scrapers break until updated. This is why they fail loudly instead of silently.
+* It's India-only right now (Screener.in only covers NSE/BSE). Extending to US stocks means adding a second data-source module (e.g. stockanalysis.com) — the logic layer needs zero changes, only a new file in the data layer, and a way for `analyze\_stock()` to pick which source to call.
+* Ten-year history is a design choice, not a law — some businesses have very different natural cycles.
+
