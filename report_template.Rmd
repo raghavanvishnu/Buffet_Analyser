@@ -381,13 +381,31 @@ Stage E showed price-only returns across the four historical PE scenarios. This 
 ```{r}
 knitr::kable(report$stage_h)
 ```
-
+```{r results='asis'}
+sh <- report$stage_h
+better_method <- ifelse(
+  mean(as.numeric(gsub("%", "", sh[["Total Return (EPS Method)"]]))) >
+  mean(as.numeric(gsub("%", "", sh[["Total Return (ROE Method)"]]))),
+  "EPS Growth method", "ROE method"
+)
+cat(paste0('<div class="finding">Key takeaway: Across all four PE scenarios, the ', better_method, ' consistently projects the higher total return.</div>'))
+```
 ### Stage I — Total Return Sensitivity to the Buy Price
 
 Everything above assumes buying at today's price. This shows how total return changes if the stock had been bought cheaper (a dip) or more expensive (a rally) before you buy, holding the projected future price and dividends fixed.
 
 ```{r}
 knitr::kable(report$stage_i)
+```
+
+```{r results='asis'}
+si <- report$stage_i
+best_row <- si[1, ]
+worst_row <- si[nrow(si), ]
+cat(paste0('<div class="finding">Key takeaway: Buying at the lowest tested price (₹', best_row[["Buy Price"]],
+    ') versus the highest (₹', worst_row[["Buy Price"]],
+    ') changes the ROE-method return from ', best_row[["Total Return (ROE Method)"]],
+    ' down to ', worst_row[["Total Return (ROE Method)"]], '.</div>'))
 ```
 
 *A lower buy price always improves total return here, since the future outcome is unchanged — this is the mathematical case for "buying the dip" when the underlying business quality hasn't changed.*
