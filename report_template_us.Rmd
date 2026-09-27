@@ -1,0 +1,346 @@
+---
+title: "Buffett-Style Stock Analysis (US)"
+output: html_document
+params:
+  ticker: "AAPL"
+  part1_questions: "default"
+  part1_answers: "default"
+---
+<style>
+h1 {
+  font-size: 2em;
+  font-weight: 800;
+  border-bottom: 3px solid #2c3e50;
+  padding-bottom: 8px;
+}
+h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-top: 40px;
+  border-bottom: 2px solid #dcdcdc;
+  padding-bottom: 5px;
+}
+h3 {
+  font-size: 1.2em;
+  font-weight: 700;
+  color: #34495e;
+  margin-top: 25px;
+}
+table {
+  margin-bottom: 20px;
+}
+.finding {
+  background: #eef3f8;
+  border-left: 4px solid #2c3e50;
+  padding: 10px 16px;
+  margin: 8px 0 24px 0;
+  font-weight: 600;
+  border-radius: 4px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+source("R/load_all.R")
+
+default_part1_questions <- c(
+  "Strong durable competitive advantage?",
+  "Do stores need to carry the product to stay in business?",
+  "Does the product have a consumer monopoly?",
+  "Can it keep raising prices with inflation?",
+  "Needs continual plant/factory upgrades?",
+  "Product/service unlikely to go obsolete?",
+  "Still sold during a recession?",
+  "Has little competition?"
+)
+
+part1_questions <- if (length(params$part1_questions) == 8) params$part1_questions else default_part1_questions
+part1_answers <- if (length(params$part1_answers) == 8) params$part1_answers else rep("Not answered", 8)
+
+report <- analyze_stock_us(params$ticker)
+```
+
+# `r report$ticker`
+
+Report generated on `r format(Sys.Date(), "%d %B %Y")`. This report applies a simplified version of Warren Buffett's value-investing checklist to publicly available US financial data. It is for educational purposes only and is not investment advice.
+
+*Note: ROE for buyback-heavy companies (large share repurchases shrink book equity, inflating ROE) can distort the ROE-based valuation method below — treat a very high average ROE (well above 40-50%) as a signal to weight the EPS Growth method more heavily.*
+
+## Company Profile
+
+**`r report$profile$company_name`**`r if (!is.na(report$profile$sector)) paste0(" — ", report$profile$sector, " / ", report$profile$industry)`
+
+`r report$profile$about`
+
+
+
+## Part 1: Is the Company a Right Pick for Buffett?
+
+These are judgment calls about the business itself — not something that can be pulled from financial statements. The answers below were provided by whoever requested this report, not computed by the app.
+
+```{r}
+data.frame(
+  Question = part1_questions,
+  Answer = part1_answers
+) %>% knitr::kable()
+```
+
+## Part 2: Numbers at a Glance
+
+```{r}
+checklist_df <- data.frame(
+  Criterion = c(
+    "Strong upward EPS trend (10yr)",
+    "ROE above 15% (10yr avg)",
+    "ROIC/ROCE above 12% (10yr avg)",
+    "Long-term debt < 5x Net Income",
+    "Free Cash Flow positive (all years)"
+  ),
+  Result = c(
+    ifelse(report$checklist$eps_upward_trend, "Yes", "No"),
+    ifelse(report$checklist$roe_above_15, "Yes", "No"),
+    ifelse(report$checklist$roic_above_12, "Yes", "No"),
+    ifelse(report$checklist$debt_below_5x_ni, "Yes", "No"),
+    ifelse(report$checklist$fcf_positive, "Yes", "No")
+  )
+)
+knitr::kable(checklist_df)
+```
+
+```{r results='asis'}
+n_pass <- sum(unlist(report$checklist[-1]))
+cat(paste0('<div class="finding">Key takeaway: ', report$ticker, ' passes ', n_pass, ' of 5 Buffett quality checks.</div>'))
+```
+
+## Historical Trends
+
+```{r}
+years <- names(report$metrics$roe)
+hist_df <- data.frame(
+  Year = years,
+  `ROE %` = round(as.numeric(report$metrics$roe), 2),
+  `EPS ($)` = round(as.numeric(report$metrics$eps), 2),
+  `ROCE %` = round(as.numeric(report$metrics$roce), 2),
+  `FCF ($M)` = round(as.numeric(report$metrics$free_cash_flow), 2),
+  check.names = FALSE
+)
+knitr::kable(hist_df)
+```
+
+```{r fig.width=10, fig.height=8}
+long_df <- rbind(
+  data.frame(Year = years, Value = as.numeric(report$metrics$roe), Metric = "ROE %"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$eps), Metric = "EPS ($)"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$roce), Metric = "ROCE %"),
+  data.frame(Year = years, Value = as.numeric(report$metrics$free_cash_flow), Metric = "FCF ($M)")
+)
+long_df$Year <- factor(long_df$Year, levels = years)
+
+make_plot <- function(metric_name) {
+  d <- long_df[long_df$Metric == metric_name, ]
+  plot_ly(d, x = ~Year, y = ~Value, type = "scatter", mode = "lines+markers",
+          line = list(color = "#2c3e50"), marker = list(color = "#2c3e50"),
+          name = metric_name, hovertemplate = paste0(metric_name, ": %{y}<br>%{x}<extra></extra>")) %>%
+    layout(
+      annotations = list(
+        text = metric_name, x = 0.5, y = 1.08, xref = "paper", yref = "paper",
+        showarrow = FALSE, font = list(size = 13, face = "bold")
+      ),
+      xaxis = list(tickangle = -90, tickfont = list(size = 9)),
+      margin = list(b = 70)
+    )
+}
+
+subplot(
+  make_plot("ROE %"), make_plot("EPS ($)"),
+  make_plot("ROCE %"), make_plot("FCF ($M)"),
+  nrows = 2, margin = 0.08, titleY = TRUE, titleX = TRUE
+) %>% layout(showlegend = FALSE)
+```
+
+```{r results='asis'}
+roe_vals <- as.numeric(report$metrics$roe)
+cat(paste0('<div class="finding">Key takeaway: ROE has ranged from ', round(min(roe_vals),1), '% to ', round(max(roe_vals),1), '%, currently at ', round(roe_vals[length(roe_vals)],1), '%.</div>'))
+```
+
+## Part 3: Is the Price a Cheap Price?
+
+### Stage A — Initial Rate of Return
+
+This treats the stock like a bond: EPS ÷ Price gives a rough "earnings yield." Below, that is compared against the 10-year sovereign bond yield in each major currency. The US Treasury is the natural primary comparison for a US-listed stock (it is the investor's home-currency risk-free alternative), with the others shown for broader context.
+
+```{r}
+data.frame(
+  Metric = c("Current EPS", "Current Price", "Initial Rate of Return"),
+  Value = c(
+    round(report$stage_a$current_eps, 2),
+    round(report$stage_a$current_price, 2),
+    paste0(round(report$stage_a$initial_rate_of_return, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+```{r}
+knitr::kable(report$stage_a$bond_comparison)
+```
+
+```{r results='asis'}
+bc <- report$stage_a$bond_comparison
+win_col <- bc[[ncol(bc)]]
+wins <- sum(win_col == "Stock Wins")
+total_b <- nrow(bc)
+cat(paste0('<div class="finding">Key takeaway: Earnings yield of ', round(report$stage_a$initial_rate_of_return,2), '% beats ', wins, ' of ', total_b, ' sovereign benchmarks shown.</div>'))
+```
+
+### Stage B — Expected Return (ROE Method): Computation Sheet
+
+```{r}
+data.frame(
+  Step = c(
+    "1. Average ROE (10yr)",
+    "2. Average Payout Ratio (10yr)",
+    "3. Sustainable Growth Rate = ROE x (1 - Payout)",
+    "4. Current Book Value (per share)",
+    "5. Future Book Value = Book Value x (1 + Growth)^10",
+    "6. Future EPS = Future Book Value x Average ROE",
+    "7. P/E Ratio applied",
+    "8. Future Stock Price = Future EPS x P/E",
+    "9. Expected Return (ROE Method)"
+  ),
+  Value = c(
+    paste0(round(report$stage_b$avg_roe, 2), "%"),
+    paste0(round(report$stage_b$avg_payout, 2), "%"),
+    paste0(round(report$stage_b$growth_rate, 2), "%"),
+    round(report$stage_b$book_value, 2),
+    round(report$stage_b$future_book_value, 2),
+    round(report$stage_b$future_eps, 2),
+    round(report$stage_b$pe_ratio, 2),
+    round(report$stage_b$future_price, 2),
+    paste0(round(report$stage_b$expected_return_roe_method, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: ROE method projects a ', round(report$stage_b$expected_return_roe_method,2), '% annual return over 10 years.</div>'))
+```
+
+### Stage C — Expected Return (EPS Growth Method): Computation Sheet
+
+```{r}
+data.frame(
+  Step = c(
+    "1. Current EPS",
+    "2. Historical EPS Growth Rate (10yr CAGR)",
+    "3. Future EPS = Current EPS x (1 + Growth)^10",
+    "4. P/E Ratio applied",
+    "5. Future Stock Price = Future EPS x P/E",
+    "6. Expected Return (EPS Method)"
+  ),
+  Value = c(
+    round(report$stage_c$current_eps, 2),
+    paste0(round(report$stage_c$eps_growth_rate, 2), "%"),
+    round(report$stage_c$future_eps, 2),
+    round(report$stage_c$pe_ratio, 2),
+    round(report$stage_c$future_price, 2),
+    paste0(round(report$stage_c$expected_return_eps_method, 2), "%")
+  )
+) %>% knitr::kable()
+```
+
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: EPS growth method projects a ', round(report$stage_c$expected_return_eps_method,2), '% annual return.</div>'))
+```
+
+### Stage D — Verdict Based on Projected Share Price Increase
+
+```{r}
+verdict_color <- switch(report$stage_d$verdict,
+  "FANTASTIC" = "green",
+  "GOOD" = "darkorange",
+  "UNACCEPTABLE" = "red"
+)
+```
+
+**Average Expected Return:** `r round(report$stage_d$avg_expected_return, 2)`%
+
+**Verdict:** <span style="color:`r verdict_color`; font-weight:bold; font-size:1.3em;">`r report$stage_d$verdict`</span>
+
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: At the present stock price, the return is ',
+    ifelse(report$stage_d$avg_expected_return < 12, 'below', 'above'),
+    ' our expected minimum threshold of 12%, at ', round(report$stage_d$avg_expected_return,2),
+    '% based on stock price increase alone.</div>'))
+```
+
+**What these verdicts mean:** Greater than 20% = Fantastic · 12-20% = Good · Below 12% = Unacceptable.
+
+### Stage E — Verdict Sensitivity: Min / Mean / Max Historical PE
+
+```{r}
+knitr::kable(report$stage_e)
+```
+
+### Stage F — Total Return (Price Appreciation + Dividends)
+
+```{r}
+knitr::kable(report$stage_f)
+```
+
+### Stage G — Final Verdict (Including Dividends)
+
+```{r}
+verdict_color_g <- switch(report$stage_g$verdict,
+  "FANTASTIC" = "green",
+  "GOOD" = "darkorange",
+  "UNACCEPTABLE" = "red"
+)
+```
+
+**Average Total Expected Return:** `r round(report$stage_g$avg_total_expected_return, 2)`%
+
+**Final Verdict (Including Dividends):** <span style="color:`r verdict_color_g`; font-weight:bold; font-size:1.3em;">`r report$stage_g$verdict`</span>
+
+```{r results='asis'}
+cat(paste0('<div class="finding">Key takeaway: Final verdict including dividends: ', report$stage_g$verdict, ' at ', round(report$stage_g$avg_total_expected_return,2), '%.</div>'))
+```
+
+### Stage H — Total Return Across All PE Scenarios
+
+```{r}
+knitr::kable(report$stage_h)
+```
+
+### Stage I — Total Return Sensitivity to the Buy Price
+
+```{r}
+knitr::kable(report$stage_i)
+```
+
+## Projected Dividends
+
+```{r}
+knitr::kable(report$dividends$table)
+```
+
+**Total dividends over `r nrow(report$dividends$table)` years (ROE Method):** $`r report$dividends$total_dividend_roe_method` per share
+
+**Total dividends over `r nrow(report$dividends$table)` years (EPS Method):** $`r report$dividends$total_dividend_eps_method` per share
+
+## Data Sources
+
+| Data | Source |
+|---|---|
+| Financial statements & ratios | [roic.ai](https://www.roic.ai) |
+| Historical share price | Yahoo Finance, via the `tidyquant` R package |
+| Sovereign bond yields | Manually entered from recent market data; **not fetched live** |
+
+## Limitations Specific to the US Version
+
+- **Book value per share is derived**, not scraped directly — calculated as EPS ÷ (ROE/100), since roic.ai's ratios page doesn't expose it directly.
+- **ROE can be distorted by large share buybacks** (very common among mature US companies), which shrink book equity and inflate ROE — see the note at the top of this report.
+- - **No machine-generated Pros/Cons list** — unlike Screener.in, roic.ai's company profile doesn't include a scored highlights summary, only the business description.
+---
+
+*This report is generated for educational purposes based on publicly available data from roic.ai and Yahoo Finance (via tidyquant). It is not investment advice. Past performance and historical ratios do not guarantee future results.*
