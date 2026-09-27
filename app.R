@@ -1,5 +1,9 @@
 library(shiny)
 library(rmarkdown)
+library(httr)
+library(jsonlite)
+
+source("R/search_company.R")
 
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
@@ -7,7 +11,11 @@ ui <- fluidPage(
   titlePanel("Buffett-Style Stock Analysis"),
   sidebarLayout(
     sidebarPanel(
-      textInput("ticker", "NSE Ticker Symbol:", placeholder = "e.g. TCS, RELIANCE, ITC"),
+      textInput("company_query", "Company Name:", placeholder = "e.g. Tata Consultancy, Infosys"),
+      actionButton("search_btn", "Search"),
+      br(), br(),
+      uiOutput("ticker_choice_ui"),
+      
       radioButtons("format", "Report Format:",
                    choices = c("HTML" = "html_document")),
       hr(),
@@ -35,13 +43,38 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   report_path <- reactiveVal(NULL)
   report_ext <- reactiveVal(NULL)
+  search_results <- reactiveVal(NULL)
+  
+  observeEvent(input$search_btn, {
+    req(input$company_query)
+    output$status <- renderUI(tags$p("Searching..."))
+    results <- search_company(input$company_query)
+    search_results(results)
+    
+    if (nrow(results) == 0) {
+      output$status <- renderUI(
+        tags$p(style = "color:red;", "No matches found. Try a different name, or type the exact NSE ticker below.")
+      )
+    } else {
+      output$status <- renderUI(tags$p(style = "color:green;", paste(nrow(results), "match(es) found.")))
+    }
+  })
+  
+  output$ticker_choice_ui <- renderUI({
+    results <- search_results()
+    if (is.null(results) || nrow(results) == 0) return(NULL)
+    
+    choices <- setNames(results$ticker, paste0(results$name, " (", results$ticker, ")"))
+    selectInput("selected_ticker", "Select the company:", choices = choices)
+  })
   
   observeEvent(input$generate, {
-    req(input$ticker)
+    ticker <- input$selected_ticker %||% input$company_query
+    req(ticker)
     
     output$status <- renderUI(tags$p("Generating report... this may take a moment."))
     
-    ext <- ifelse(input$format == "pdf_document", ".pdf", ".html")
+    ext <- ".html"
     out_file <- tempfile(fileext = ext)
     
     part1_questions <- c(
@@ -68,10 +101,10 @@ server <- function(input, output, session) {
     result <- tryCatch({
       rmarkdown::render(
         "report_template.Rmd",
-        output_format = input$format,
+        output_format = "html_document",
         output_file = out_file,
         params = list(
-          ticker = toupper(input$ticker),
+          ticker = toupper(ticker),
           part1_questions = part1_questions,
           part1_answers = part1_answers
         ),
@@ -81,7 +114,7 @@ server <- function(input, output, session) {
     }, error = function(e) {
       output$status <- renderUI(
         tags$p(style = "color:red;",
-               paste("Could not generate report. Check the ticker symbol and try again. Error:", e$message))
+               paste("Could not generate report. Check the ticker/company and try again. Error:", e$message))
       )
       FALSE
     })
@@ -97,8 +130,9 @@ server <- function(input, output, session) {
   
   output$download <- downloadHandler(
     filename = function() {
+      ticker <- input$selected_ticker %||% input$company_query %||% "report"
       req(report_ext())
-      paste0(toupper(input$ticker), "_buffett_report", report_ext())
+      paste0(toupper(ticker), "_buffett_report", report_ext())
     },
     content = function(file) {
       req(report_path())
