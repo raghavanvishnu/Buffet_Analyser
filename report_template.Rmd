@@ -82,6 +82,46 @@ if (length(report$profile$pros) > 0 || length(report$profile$cons) > 0) {
 
 *Pros/Cons above are Screener.in's own machine-generated highlights, based on their checklist — not this report's analysis. Exercise judgment.*
 
+## At a Glance
+
+```{r results='asis'}
+se <- report$stage_e
+current_pe <- se[se$Scenario == "Current PE", "PE Used"]
+mean_pe <- se[se$Scenario == "Mean Historical PE", "PE Used"]
+pe_view <- if (current_pe < mean_pe * 0.9) {
+  "Cheap vs its own history"
+} else if (current_pe > mean_pe * 1.1) {
+  "Expensive vs its own history"
+} else {
+  "Near its historical average"
+}
+
+verdict_color_ag <- switch(report$stage_g$verdict,
+  "FANTASTIC" = "green",
+  "GOOD" = "darkorange",
+  "UNACCEPTABLE" = "red"
+)
+
+n_pass_ag <- sum(unlist(report$checklist[-1]))
+
+div_low <- min(report$dividends$total_dividend_roe_method, report$dividends$total_dividend_eps_method)
+div_high <- max(report$dividends$total_dividend_roe_method, report$dividends$total_dividend_eps_method)
+
+cat(paste0(
+  '<table class="table">',
+  '<tr><td><b>Verdict</b></td><td><span style="color:', verdict_color_ag, '; font-weight:bold;">',
+      report$stage_g$verdict, '</span> (', round(report$stage_g$avg_total_expected_return, 2), '% total expected return, incl. dividends)</td></tr>',
+  '<tr><td><b>Quality Checklist</b></td><td>', n_pass_ag, ' of 5 passed</td></tr>',
+  '<tr><td><b>Current Valuation</b></td><td>', pe_view, ' (P/E ', current_pe, ' vs 10yr average ', round(mean_pe, 1), ')</td></tr>',
+  '<tr><td><b>10-Year Dividend Outlook</b></td><td>₹', round(div_low, 2), ' – ₹', round(div_high, 2), ' per share, depending on growth method</td></tr>',
+  '</table>'
+))
+```
+
+*The sections below show the full working behind these numbers — read on if you want to check the math or dig into any specific part.*
+
+
+
 ## Part 1: Is the Company a Right Pick for Buffett?
 
 These are judgment calls about the business itself — not something that can be pulled from financial statements. The answers below were provided by whoever requested this report, not computed by the app.
