@@ -510,8 +510,18 @@ cat(paste0('<div class="finding">Key takeaway: Total 10-year dividends per share
 | **Total Return** | Price appreciation plus dividends received — the complete return to a shareholder, not just the change in share price. |
 | **Margin of Safety** | Buying at a price meaningfully below estimated fair value, to cushion against errors in the projection or unexpected bad news. |
 
+## References
+
+This report's methodology is adapted from the "Buffettology" framework popularized by:
+
+- Buffett, M. & Clark, D. (1997). *Buffettology: The Previously Unexplained Techniques That Have Made Warren Buffett the World's Most Famous Investor*.
+- Buffett, M. & Clark, D. (2002). *The New Buffettology: The Proven Techniques for Investing Successfully in Changing Markets That Have Made Warren Buffett the World's Most Famous Investor*.
+- Buffett, M. & Clark, D. (2008). *Warren Buffett and the Interpretation of Financial Statements: The Search for the Company with a Durable Competitive Advantage*.
+- Belmonte, J. (2015). *Buffett and Beyond: Uncovering the Secret Ratio for Superior Stock Selection*. Wiley.
+
+This report is an independent implementation of publicly described investment principles, using data scraped from Screener.in and Yahoo Finance. It is not affiliated with, endorsed by, or reviewed by the authors above, Warren Buffett, or Berkshire Hathaway. It is generated for educational purposes only and is not investment advice — past performance and historical ratios do not guarantee future results.
 
 
 ---
 
-*This report is generated for educational purposes based on publicly available data from Screener.in and Yahoo Finance (via tidyquant). It is not investment advice. Past performance and historical ratios do not guarantee future results.*
+
