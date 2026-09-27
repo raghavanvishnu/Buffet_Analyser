@@ -374,6 +374,26 @@ cat(paste0('<div class="finding">Key takeaway: Final verdict including dividends
 
 ---
 
+### Stage H — Total Return (Price + Dividends) Across All PE Scenarios
+
+Stage E showed price-only returns across the four historical PE scenarios. This adds projected dividends to each, giving a complete total-return picture under every scenario, not just today's PE.
+
+```{r}
+knitr::kable(report$stage_h)
+```
+
+### Stage I — Total Return Sensitivity to the Buy Price
+
+Everything above assumes buying at today's price. This shows how total return changes if the stock had been bought cheaper (a dip) or more expensive (a rally) before you buy, holding the projected future price and dividends fixed.
+
+```{r}
+knitr::kable(report$stage_i)
+```
+
+*A lower buy price always improves total return here, since the future outcome is unchanged — this is the mathematical case for "buying the dip" when the underlying business quality hasn't changed.*
+
+
+
 ## Projected Dividends
 
 Using the average payout ratio, here is a projection of the EPS and dividend an investor might expect to receive per share each year, shown under both growth assumptions — the Stage B (ROE/book value) method and the Stage C (historical EPS growth) method.
